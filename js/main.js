@@ -18,13 +18,36 @@ const initApp = () => {
         processSubmission();
     });
 
+    const clearItems = document.getElementById("clearItems");
+    clearItems.addEventListener("click", (event) => {
+        const list = toDoList.getList();
+        if (list.length) {
+            const confirmed = confirm("Are you sure you want to clear the entire list?");
+            if (confirmed) {
+                toDoList.clearList();
+                updatePersistentData(toDoList.getList());
+                refreshThePage();
+            }
+        }
+    })
+
     //Procedural
 
-    //load list object
+    loadListObject();
 
     refreshThePage();
 
 };
+
+const loadListObject = () => {
+    const storedList = localStorage.getItem("myToDoList");
+    if (typeof storedList !== "string") return; 
+    const parsedList = JSON.parse(storedList);
+    parsedList.forEach(itemObj => {
+        const newToDoItem = createNewItem(itemObj._id, itemObj._item);
+        toDoList.addItemToList(newToDoItem);
+    });
+}
 
 const refreshThePage = () => {
     clearListDisplay();
@@ -60,7 +83,7 @@ const buildListItem = (item) => { //we create dom elements
     check.type = "checkbox";
     check.id = item.getId();
     check.tabIndex = 0;
-    addClickListenerToCheckbox(check)
+    addClickListenerToCheckbox(check);
     const label = document.createElement("label");
     label.htmlFor = item.getId();
     label.textContent = item.getItem();
@@ -73,15 +96,25 @@ const buildListItem = (item) => { //we create dom elements
 const addClickListenerToCheckbox = (checkbox) => {
     checkbox.addEventListener("click", (event) => {
         toDoList.removeItemFromList(checkbox.id);
-        // TODO remove from persistent data
+        updatePersistentData(toDoList.getList());
+        const removedText = getLabeledText(checkbox.id);
+        updateScreenReaderConfirmation(removedText, "removed from list");
         setTimeout(() => {
             refreshThePage();
         }, 1000);
     });
 };
 
+const getLabeledText = (checkboxId => {
+    return document.getElementById(checkboxId).nextElementSibling.textContent;
+});
+
+const updatePersistentData = (listArray) => {
+    localStorage.setItem("myToDoList", JSON.stringify(listArray));
+}
+
 const clearItemEntryField = () => {
-    documenent.getElementById("newItem").value = "";
+    document.getElementById("newItem").value = "";
 };
 
 const setFocusOnItemEntry = () => {
@@ -90,11 +123,13 @@ const setFocusOnItemEntry = () => {
 
 const processSubmission = () => {
     const newEntryText = getNewEntry();
-    if (newEntryText.length) return;
+    if (!newEntryText.length) return;
     const nextItemId = calcNextItemId();
     const toDoItem = createNewItem(nextItemId, newEntryText);
     toDoList.addItemToList(toDoItem);
-    //TODO update persistent data
+    updatePersistentData(toDoList.getList());
+    updateScreenReaderConfirmation(newEntryText, "added");
+    refreshThePage();
 };
 
 const getNewEntry = () => {
@@ -105,15 +140,19 @@ const calcNextItemId = () => {
     let nextItemId = 1; 
     const list = toDoList.getList();
     if (list.lenght > 0) {
-        nextItemId = list(list.length - 1).getId() + 1; 
+        nextItemId = list[list.length - 1].getId() + 1; //Hay una falla en el conteo del ID
     }
     return nextItemId;
 };
 
 const createNewItem = (itemId, itemText) => {
-    const toDo = new toDoItem();
+    const toDo = new ToDoItem();
     toDo.setId(itemId);
     toDo.setItem(itemText);
     return toDo;
 
-}
+};
+
+const updateScreenReaderConfirmation = (newEntryText, actionVerb) => {
+    document.getElementById("confirmation").textContent = '${newEntryText} ${actionVerb}.';
+};
